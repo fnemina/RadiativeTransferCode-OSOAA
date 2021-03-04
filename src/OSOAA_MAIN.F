@@ -998,6 +998,12 @@ C                               ET de l'angle zénithal de visée,
 C				pour l'azimut Phi fixé.
 C                               (nom fichier + extension)
 C                               ==> Pas produit si non défini.	 
+C         -OSOAA.ResFile.Adv.Phi  ==> Optionnel  
+C             FICSOS_RES_ADV_PHI (CHARACTER*CTE_LENFIC2) : 
+C				Filename for the results for of radiances for a fixed altitude
+C                               and several azimuthal angles.
+C                               (filename + extension)
+C                               ==> Not produced if not defined.	
 C
 C         -SOS.Log ==> Optionnel
 C             FICSOS_LOG (CHARACTER*CTE_LENFIC2): Nom du fichier trace des 
@@ -1145,6 +1151,10 @@ C               du niveau (profondeur ou altitude) et de l'angle zénithal de vis
 C               pour une valeur fixée de l'azimut relatif.
 C               (-OSOAA.ResFile.Adv.Up   ==>  FICSOS_RES_ADV_UP
 C		 -OSOAA.ResFile.Adv.Down ==>  FICSOS_RES_ADV_DOWN)  
+
+C             - Illumination field as a function of the zenithal view angle and the 
+C               relative azimuth angle for a fixed level (depth or altitude)
+C               (-OSOAA.ResFile.Adv.Phi   ==>  FICSOS_RES_ADV_PHI
 C
 C
 C         Fichier de flux (Flux.txt) : Donne le profil de flux descendant du TOA 
@@ -1859,6 +1869,9 @@ C   des fichiers résultats
 	     				       	! luminance descendante en fonction de la
 	     					! profondeur (ou altitude) 
 						! (Phi et VZA fixés)
+
+      CHARACTER*CTE_LENFIC2 FICSOS_RES_ADV_PHI ! (S) Filename for the output file
+      ! of the radiation file for a fixed altitude or depth
 						
       CHARACTER*CTE_LENFIC2 FICSOS_RES_BIN  	! (S) Nom du fichier résultat binaire
       						! en sortie des calculs SOS	
@@ -1970,7 +1983,8 @@ C     Nom par défaut du fichier résultat de luminance en fonction du niveau
     
 C     Pas de fichier résultat "Advanced"
       FICSOS_RES_ADV_UP = "NO_ADVANCED_FILE" 
-      FICSOS_RES_ADV_DOWN = "NO_ADVANCED_FILE"        
+      FICSOS_RES_ADV_DOWN = "NO_ADVANCED_FILE"
+      FICSOS_RES_ADV_PHI = "NO_ADVANCED_FILE"        
 
 C     Nombre d'interactions maximal par défaut positionné à la valeur
 C     de la constante CTE_DEFAULT_IGMAX
@@ -2929,6 +2943,9 @@ C         des fichiers résultats
 	 						!la profondeur	(ou altitude) 
 	 						!ET de l'angle devisée (Phi fixé).
 
+      IF (KEYWORD.EQ."-OSOAA.ResFile.Adv.Phi") THEN	!Filename for the illumination field
+        CALL GETARG (NPARAM+1,FICSOS_RES_ADV_Phi)	! for a fixed level as a function
+      ENDIF   	        			! of the zenithal view and relative azimuth angles
 
 	 IF (KEYWORD.EQ."-SOS.Log") THEN
 	     CALL GETARG (NPARAM+1,FICSOS_LOG)	 !Nom du fichier Trace des calculs de 
@@ -3124,6 +3141,13 @@ C ---- Position de l'arborescence complète des différents fichiers
            FICSOS_RES_ADV_DOWN = RESROOT_ADV(1:LDIRADV)//'/'
      &                      //FICSOS_RES_ADV_DOWN(1:LFIC)      
        ENDIF  
+
+       IF (FICSOS_RES_ADV_PHI.NE."NO_ADVANCED_FILE") THEN
+        LFIC = INDEX(FICSOS_RES_ADV_PHI,' ') - 1
+        IF((LFIC.LE.0).OR.(LFIC.GT.CTE_LENFIC2)) GOTO 1996
+        FICSOS_RES_ADV_PHI = RESROOT_ADV(1:LDIRADV)//'/'
+     &                      //FICSOS_RES_ADV_PHI(1:LFIC)      
+       ENDIF   
                  	     	
        !Fichier Trace des calculs SOS
        IF (FICSOS_LOG.NE."NO_LOG_FILE") THEN
@@ -4216,6 +4240,10 @@ C     -OSOAA.ResFile.Adv.Up:
 C     -OSOAA.ResFile.Adv.Down:
       LFIC = INDEX(FICSOS_RES_ADV_DOWN,' ') - 1
       WRITE(11,1925,ERR=3501) FICSOS_RES_ADV_DOWN(1:LFIC)
+
+C     -OSOAA.ResFile.Adv.Phi:
+      LFIC = INDEX(FICSOS_RES_ADV_PHI,' ') - 1
+      WRITE(11,1929,ERR=3501) FICSOS_RES_ADV_PHI(1:LFIC)
       
 C     -SOS.Log:
       LFIC = INDEX(FICSOS_LOG,' ') - 1
@@ -6271,6 +6299,8 @@ C
 	  WRITE (IDLOG,*,ERR=910) "Advanced output files:"
 	  WRITE (IDLOG,890,ERR=910) FICSOS_RES_ADV_UP
 	  WRITE (IDLOG,891,ERR=910) FICSOS_RES_ADV_DOWN	 
+      WRITE (IDLOG,8972,ERR=910) FICSOS_RES_ADV_PHI
+      
 	  WRITE (IDLOG,*,ERR=910) "Output parameters:"
 	  WRITE (IDLOG,892,ERR=910) PHI 
 	  WRITE (IDLOG,*,ERR=910) 
@@ -6299,7 +6329,8 @@ C
      &               IMAT_SURF, DIRSEA, SEA_IND, WIND, 
      &               RHO_SURF, RHO_BOT, IGMAX,
      &    	     FICSOS_RES_BIN,
-     &               PHI, FICSOS_RES_ADV_UP, FICSOS_RES_ADV_DOWN,              
+     &               PHI, FICSOS_RES_ADV_UP, FICSOS_RES_ADV_DOWN,
+     &               FICSOS_RES_ADV_PHI,              
      &    	     LEVEL_OUT,USER_Z_OUT, FICSOS_RES_VS_VZA,
      &		     VZA_OUT, FICSOS_RES_VS_Z,FIC_FLUX,
      &    	     FICSOS_LOG, APPEL_SOS_CORE, IER)
@@ -7817,7 +7848,7 @@ C --- Formats pour le fichier Trace : entrées de OSOAA_SOS
  8971 FORMAT(40h       Output file FIC_FLUX         :   ,A)
   898 FORMAT(40h       FICSOS_LOG                   :   ,A)
   899 FORMAT(40h       CALL OF SOS_CORE             :   ,A)
- 
+ 8972 FORMAT(32h       FICSOS_RES_ADV_PHI:     ,A)            
 
 C --- Formats pour le fichier ListParam.txt
  1800 FORMAT(30h -OSOAA.ResRoot         :     ,A) 
@@ -7952,7 +7983,7 @@ C --- FIN MOD
  1926 FORMAT(30h -SOS.Log               :     ,A)
  1927 FORMAT(30h -SOS.IGmax             :     ,I4)
  1928 FORMAT(30h -SOS.ResFile.Bin       :     ,A)
-
+ 1929 FORMAT(30h -OSOAA.ResFile.Adv.Phi :     ,A)
   
       END          !FIN DU PROGRAMME OSOAA_MAIN  
 
