@@ -2814,7 +2814,7 @@ C    We set PHI = 0
      &                 XIT_PHI1, XQT_PHI1, XUT_PHI1, IER)
       IF (IER.NE.0) GOTO 1070   ! cas d'erreur  
 
-      WRITE(10,*) 'FRAN3'
+      
       PHI2 = PHI1 + INCTE_PI 
       CALL OSOAA_TRPHI(FICSOS_RES_BIN,NBMU,RMU,PHI2,
      &                 IMAT_SURF,N0,M0,WIND,SEA_IND,ATM_TAUEXT, 	
@@ -2843,7 +2843,7 @@ C    We set PHI = 0
       
                !Enregistrement du champ descendant
                      WRITE(10,750,ERR=1101) I,Z_I,-TETA,
-     &       PHI1*180.D+00/INCTE_PI,ANGDIFF,XI,XQ,XU,XAN,TPOL,LPOL
+     &       PHI2*180.D+00/INCTE_PI,ANGDIFF,XI,XQ,XU,XAN,TPOL,LPOL
             ENDIF
                ENDDO !Boucle sur directions 
 
