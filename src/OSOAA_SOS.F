@@ -190,6 +190,9 @@ C				       (S) : Nom du fichier résultat donnant la luminance
 C	     				     descendante en fonction de la profondeur 
 C	     				     (ou de l'altitude) pour Phi et VZA fixés.
 C                                            (chemin complet)
+C     FICSOS_RES_ADV_PHI  (CHAR*CTE_LENFIC2) 
+C				       (S) : Filename for the illumination file for a fixed level
+C                        (depth of altitude) as a function of PHI and VZA.
 C
 C     LEVEL_OUT  (I4)   	       (E) : Indicateur du choix du niveau de sortie 
 C                                            des luminances (pour le fichier de résultats en
@@ -256,6 +259,10 @@ C               .
 C  - FICSOS_RES_ADV_DOWN : Sortie avancée dédié aux utilisateurs expert
 C      Fichier du champ de luminance descendante en fonction du niveau (profondeur ou 
 C      altitude) et de l'angle zénithal de visée, pour une valeur fixée de l'azimut relatif.
+C
+C  - FICSOS_RES_ADV_PHI : Advanced file for use of experts
+C      Filename for the illumination file for a fixed level as a function of the zenithal view
+C      Angle and azimuth angle.
 C 
 C  - FIC_FLUX : Sortie imposée (ce fichier est nécessaire car OSOAA_SOS_CORE n'est pas 
 C                               exécutée si les paramètres de simulation du champ de 
@@ -410,7 +417,7 @@ C			- Colonne 7 : la réflectance polarisée au niveau Z
 C				      (PI * Lpol(z) / Ed(z))
 C
 C
-C    Fichiers résultats FICSOS_RES_ADV_UP et FICSOS_RES_ADV_DOWN: 
+C    Fichiers résultats FICSOS_RES_ADV_UP, FICSOS_RES_ADV_DOWN and FICSOS_RES_ADV_PHI: 
 C      ==>   contiennent les champs de luminance montante ou descendante 
 C            en fonction du niveau (profondeur ou altitude)
 C            et de l'angle zénithal de visée, pour une valeur fixée de l'azimut relatif.
@@ -474,6 +481,7 @@ C==============================================================================
      & 			   RHO_SURF, RHO_BOT, IGMAX,
      &			   FICSOS_RES_BIN,
      &                     PHI, FICSOS_RES_ADV_UP,FICSOS_RES_ADV_DOWN,
+     &                     FICSOS_RES_ADV_PHI,
      &    	           LEVEL_OUT,USER_Z_OUT, FICSOS_RES_VS_VZA,
      &		           VZA_OUT, FICSOS_RES_VS_Z,FIC_FLUX,
      &                     FICSOS_LOG, APPEL_SOS_CORE, IER)
@@ -844,6 +852,10 @@ C---- Fichiers utilisés
       CHARACTER*CTE_LENFIC2 FICSOS_RES_ADV_DOWN	! (S) Nom du fichier résultat donnant la
 	     				       	!luminance descendante en fct de la 
 						!profondeur (ou altitude) (Phi et VZA fixés)
+
+      CHARACTER*CTE_LENFIC2 FICSOS_RES_ADV_PHI	! (S) filename for the output file
+                           ! for the resulting illumination field for a fixed altitude
+                           ! as a function of phi and view zenith angle
 						
       CHARACTER*CTE_LENFIC2 FICSOS_RES_BIN  	! (S) Nom du fichier résultat binaire
       						!en sortie des calculs SOS	
@@ -1818,6 +1830,15 @@ C **************************************************************
 	    WRITE (IDLOG,*,ERR=1010) 
      &	    "  --> No Advanced Down file to produce"
 	 ENDIF
+
+      IF (FICSOS_RES_ADV_PHI.NE."NO_ADVANCED_FILE") THEN
+      WRITE (IDLOG,*,ERR=1010) 
+     &	    "  --> Creation of file Advanced Down : ",
+     & 	    FICSOS_RES_ADV_PHI
+        ELSE
+      WRITE (IDLOG,*,ERR=1010) 
+     &	    "  --> No Advanced Phi file to produce"
+      ENDIF
 	    
 	 WRITE (IDLOG,*,ERR=1010) " " 
 	 
@@ -2051,8 +2072,8 @@ C     pour toutes les directions de propagation descendantes.
 	  CLOSE(10) !Fermeture du fichier FICSOS_RES_ADV_DOWN
       ENDIF   
 
-   
-  
+
+ 
    
    
 C ************************************************************   
@@ -2711,6 +2732,462 @@ C ********************************************************
 
       
 
+C CONEA
+C --- Création du fichier FICSOS_RES_ADV_PHI donnant le champ
+C     de rayonnement sur tout le profil (marin et atmosphérique)
+C     pour toutes les directions de propagation descendantes.
+      IF (FICSOS_RES_ADV_PHI.NE."NO_ADVANCED_FILE") THEN
+      !Gestion de l'altitude ou profondeur du profil (Z_OUT) selon
+      !le cas de type de niveau de sortie
+      IF (LEVEL_OUT.EQ.1) Z_OUT = PROFIL_Z(0)		 !TOA
+      IF (LEVEL_OUT.EQ.2) Z_OUT = PROFIL_Z(NT_TOT)	 !Sea bottom
+      IF (LEVEL_OUT.EQ.3) Z_OUT = PROFIL_Z(CTE_NT_ATM)	 !Sea surface 0+
+      IF (LEVEL_OUT.EQ.4) Z_OUT = PROFIL_Z(CTE_NT_ATM+1) !Sea surface 0-
+      				!==Juste sous la surface.
+      IF (LEVEL_OUT.EQ.5) Z_OUT = USER_Z_OUT		 !user's value
+ 
+ 
+      !Copie de l'altitude/profondeur de sortie requise par l'utilisateur
+      !(valeur utilisateur ou option choix TOA/fond, Surface 0+/O-)
+      USER_Z_OUT = Z_OUT
+	   
+	   
+      IF (TRACE) THEN
+         WRITE (IDLOG,*,ERR=1010) " "
+	      WRITE (IDLOG,*,ERR=1010) 
+     &    "  --> Creation of the advanced PHI output : ",
+     & 	    FICSOS_RES_ADV_PHI
+          WRITE (IDLOG,*,ERR=1010) " "
+         IF (LEVEL_OUT.EQ.1) THEN
+            WRITE(IDLOG,*,ERR=1010) "      Output profile level : TOA" 
+         ENDIF
+         IF (LEVEL_OUT.EQ.2) THEN
+            WRITE(IDLOG,*,ERR=1010) 
+     &	        "      Output profile level : Sea bottom"   
+         ENDIF	  
+         IF (LEVEL_OUT.EQ.3) THEN
+            WRITE(IDLOG,*,ERR=1010) 
+     &	        "      Output profile level : Sea surface 0+"   
+         ENDIF	  
+         IF (LEVEL_OUT.EQ.4) THEN
+            WRITE(IDLOG,*,ERR=1010) 
+     &	        "      Output profile level : Sea surface 0-"   
+         ENDIF	  
+         IF (LEVEL_OUT.EQ.5) THEN
+            WRITE(IDLOG,*,ERR=1010) 
+     &	        "      Output profile level : User's definition"   
+         ENDIF	  	  
+               WRITE (IDLOG,*,ERR=1010) 
+     &	    "      Output level of required results (m) : ", Z_OUT
+         WRITE (IDLOG,*,ERR=1010) " "
+      ENDIF ! Fin Trace
+      
+         
+      ! Interpolation pour le niveau sollicité
+      !------------------------------------------------------------------------       
+       
+      ! Cas Z_OUT supérieur à l'altitude max
+      IF (Z_OUT.GT.PROFIL_Z(0)) THEN
+      
+          !Ajustement de Z_OUT à l'altitude max
+	  Z_OUT = PROFIL_Z(0)
+	   
+	  IF (TRACE) THEN
+              WRITE (IDLOG,*,ERR=1010) 
+     &	      "      Output altitude > max value: ", PROFIL_Z(0)
+              WRITE (IDLOG,*,ERR=1010) 
+     &	      "      ==> Output altitude (m) becomes : ",PROFIL_Z(0)
+              WRITE (IDLOG,*,ERR=1010) " "
+          ENDIF ! Fin Trace
+	   
+      ENDIF 
+       
+      ! Cas Z_OUT inférieur à la profondeur max
+      IF (Z_OUT.LT.PROFIL_Z(NT_TOT)) THEN
+      
+        !Ajustement de Z_OUT à la profondeur max
+          Z_OUT = PROFIL_Z(NT_TOT)
+	   
+	  IF (TRACE) THEN
+              WRITE (IDLOG,*,ERR=1010) 
+     &	      "      Output depth > max value : ", 
+     &        PROFIL_Z(NT_TOT)
+              WRITE (IDLOG,*,ERR=1010) 
+     &	      "      ==> Output depth (m) becomes : ", 
+     &        PROFIL_Z(NT_TOT)
+              WRITE (IDLOG,*,ERR=1010) " "
+          ENDIF ! Fin Trace
+	   
+      ENDIF 
+       
+      ! Estimation des niveaux Z1 et Z2 encadrant Z_OUT
+      IF ((LEVEL_OUT.GE.1).AND.(LEVEL_OUT.LE.4)) THEN
+         !Cas 0+ et 0 - : gestion spécifique car tous deux à Z=0
+	 
+	 
+	 IF (LEVEL_OUT.EQ.1) THEN    !Sortie TOA
+	    I1 = 0
+	 ENDIF
+	 
+	 IF (LEVEL_OUT.EQ.2) THEN    !Sortie fond mer
+	    I1 = NT_TOT 
+	 ENDIF
+	 
+	 IF (LEVEL_OUT.EQ.3) THEN    !Sortie niveau 0+
+	    I1 = CTE_NT_ATM
+	 ENDIF
+	 
+	 IF (LEVEL_OUT.EQ.4) THEN    !Sortie niveau 0-
+	    I1 = CTE_NT_ATM + 1	     
+	 ENDIF
+	 
+	 I2 = I1
+	 
+      ELSE
+         !Cas LEVEL_OUT = 5 (Z_OUT utilisateur)
+      
+         !Recherche si Z_OUT correspond à une valeur du profil
+         LRECH_OK=.FALSE.
+	 I=0
+         DO WHILE (I.LE.NT_TOT)
+	     IF (Z_OUT.EQ.PROFIL_Z(I)) THEN
+	        I1=I
+	        I2=I  
+		LRECH_OK=.TRUE.
+		I=NT_TOT
+	     ENDIF 
+	     I = I+1
+         ENDDO
+	 
+	 !Recherche des niveaux du profil encadrant Z_OUT 
+	 IF (LRECH_OK.EQV..FALSE.) THEN
+	    I=0
+            DO WHILE (Z_OUT.LT.PROFIL_Z(I)) 
+	        I = I+1
+            ENDDO
+            I1 = I-1
+            I2 = I
+         ENDIF
+	 
+      ENDIF ! Fin test sur LEVEL_OUT 
+      Z1 = PROFIL_Z(I1)
+      Z2 = PROFIL_Z(I2)
+      
+      IF (TRACE) THEN
+         WRITE (IDLOG,*,ERR=1010) 
+     &	 "      upper level I Z(m) : ", I1, Z1
+         WRITE (IDLOG,*,ERR=1010) 
+     &	 "      Lower level I Z(m) : ", I2, Z2
+      ENDIF ! Fin Trace
+ 
+      
+      OPEN(10,FILE=FICSOS_RES_ADV_PHI,FORM='FORMATTED',ERR=1200)   
+
+      WRITE(10,*) 'ADVANCED RESULTS : '
+      WRITE(10,*) '  UPWARD RADIANCE FIELD VERSUS THE'//
+     &            ' VIEWING ZENITH ANGLE AND RELATIVE AZIMUTH'
+      WRITE(10,*) '  (ALTITUDE/DEPTH ARE FIXED)'
+      WRITE(10,*) '----------------------------------------------'//
+     &'-------------------------------------------------'   
+      WRITE(10,*) 'Relative azimuth (degrees) :'
+      WRITE(10,*) ' '
+      WRITE(10,*) '   Relative azimuth convention : '
+      WRITE(10,*) 
+     &   '       180° <-> Satellite and Sun in the same half-plane'
+      WRITE(10,*) 
+     &   '         0° <-> Satellite and Sun in opposite half-planes'//
+     &   ' with respect to the zenith direction'
+      WRITE(10,*) ' '
+        
+     
+      !TOA
+      IF (LEVEL_OUT.EQ.1) THEN
+          WRITE(10,*) 'TOA level - Altitude (km) :', Z_OUT/1000.
+      ENDIF
+      
+      !Sea bottom
+      IF (LEVEL_OUT.EQ.2) THEN
+         WRITE(10,*) 'Sea bottom level - Depth (m) :', Z_OUT,
+     &	          ' (limited to the maximum computed depth)'
+      ENDIF
+      
+      !Sea surface 0+
+      IF (LEVEL_OUT.EQ.3) THEN
+          WRITE(10,*) 'Above sea surface level 0+ - Altitude (km) :', 
+     &	              Z_OUT
+      ENDIF      
+      
+      !Sea surface 0-
+      IF (LEVEL_OUT.EQ.4) THEN
+          WRITE(10,*) 'Under sea surface level 0- - Depth (m) :', Z_OUT
+      ENDIF 
+      
+      !Z user's value
+      IF (LEVEL_OUT.EQ.5) THEN
+             
+	 IF (Z_OUT.GE.0.) THEN !Dans atmosphère
+      
+           IF (Z_OUT.NE.USER_Z_OUT) THEN
+	       WRITE(10,*) 'Altitude (km) :', USER_Z_OUT/1000.,
+     &	                   ' limited to the maximum altitude', 
+     &                     Z_OUT/1000.
+	    ELSE
+	       WRITE(10,*) 'Altitude (km) :', Z_OUT/1000.
+	    ENDIF
+          
+         ELSE !Dans mer
+      
+            IF (Z_OUT.NE.USER_Z_OUT) THEN !Cas d'ajustement de la profondeur 
+	    				  !de sortie par le code
+	       WRITE(10,*)  
+     &	         'Requested value of the depth for the output(m) :',  
+     &	         USER_Z_OUT,
+     &	         ' ==> limited to the max computed depth :', Z_OUT	        
+	    ELSE !Cas nominal
+	       WRITE(10,*) 
+     &	         'Value of the depth selected for the output (m) :', 
+     &	         Z_OUT
+	    ENDIF
+	       
+         ENDIF !Fin test sur Z_OUT
+	 
+      ENDIF !Fin LEVEL_OUT = 5
+    
+      
+      WRITE(10,*) ' '
+      WRITE(10,*) 'Columns parameters :'
+      WRITE(10,*) '  VZA     :  Viewing Zenith Angle (deg)'
+      WRITE(10,*) '  PHI     :  Relative Azimuth Angle (deg)'
+      WRITE(10,*) '  SCA_ANG :  Scattering angle (deg)'
+      WRITE(10,*) 
+     &	 '  I       :  Stokes parameter at output level Z (in sr-1)'
+      WRITE(10,*) 
+     &	 '             normalised to the extraterrestrial solar'//
+     &   ' irradiance (PI * L(z) / Esun)'
+      WRITE(10,*) 
+     &	 '  Q       :  Stokes parameter at output level Z (in sr-1)'
+      WRITE(10,*) 
+     &	 '             normalised to the extraterrestrial solar'//
+     &   ' irradiance (PI * L(z) / Esun)'
+      WRITE(10,*) 
+     &	 '  U       :  Stokes parameter at output level Z (in sr-1)'
+      WRITE(10,*) 
+     &	 '             normalised to the extraterrestrial solar'//
+     &   ' irradiance (PI * L(z) / Esun)'
+      WRITE(10,*) 
+     &  '  REFL    :  Reflectance at output level Z (PI * L(z) / Ed(z))'
+      WRITE(10,*) '  POL_RATE:  Degree of polarization (%)'
+      WRITE(10,*) 
+     &	 '  LPOL    :  Polarized intensity at output level Z (in sr-1)'
+      WRITE(10,*) 
+     &	 '             normalised to the extraterrestrial solar'//
+     &   ' irradiance (PI * Lpol(z) / Esun)'
+      
+      WRITE(10,*) 
+     &   '  REFL_POL:  Polarized reflectance at output level Z'//
+     &   ' (PI * Lpol(z) / Ed(z))'
+
+      WRITE(10,*) '----------------------------------------------'//
+     &'------------------------------------------------'//
+     &'-------------------------'   
+      WRITE(10,*) '  VZA    PHI     SCA_ANG       I              '//
+     & 'Q              U              REFL'//
+     & '       POL_RATE     LPOL        REFL_POL'
+     
+     
+        
+      DZ = Z2-Z1
+
+C    We set PHI = 0      
+      PHI1 = 0 * INCTE_PI / 180.D+00
+      
+      DO WHILE (PHI1.LE.INCTE_PI)
+      CALL OSOAA_TRPHI(FICSOS_RES_BIN,NBMU,RMU,PHI1,
+     &                 IMAT_SURF,N0,M0,WIND,SEA_IND,ATM_TAUEXT, 
+     &                 SEA_TAUEXT,ANGDIFF_PHI1,			 
+     &                 XIT_PHI1, XQT_PHI1, XUT_PHI1, IER)
+      IF (IER.NE.0) GOTO 1070   ! cas d'erreur  
+
+      
+      PHI2 = PHI1 + INCTE_PI 
+      CALL OSOAA_TRPHI(FICSOS_RES_BIN,NBMU,RMU,PHI2,
+     &                 IMAT_SURF,N0,M0,WIND,SEA_IND,ATM_TAUEXT, 	
+     &                 SEA_TAUEXT,ANGDIFF_PHI2,		 		
+     &                 XIT_PHI2, XQT_PHI2, XUT_PHI2, IER)
+      IF (IER.NE.0) GOTO 1070   ! cas d'erreur  
+
+      OPEN(10,FILE=FICSOS_RES_ADV_PHI,FORM='FORMATTED',
+     & POSITION='APPEND',ERR=1100)
+      IF (DZ.NE.0.D+00) THEN
+      
+          !Interpolation du flux descendant (normalisé par Es = PI) pour le niveau Z
+          COEF_A = PROFIL_FLUX_DOWN_TOT(I2)-PROFIL_FLUX_DOWN_TOT(I1) 
+	  COEF_A = COEF_A / DZ
+	  COEF_B = Z2*PROFIL_FLUX_DOWN_TOT(I1) 
+	  COEF_B = COEF_B -Z1*PROFIL_FLUX_DOWN_TOT(I2)
+	  COEF_B = COEF_B / DZ	
+ 	  FLUX_DOWN_NORMA = COEF_A*Z_OUT+COEF_B  ! Flux descendant total (direct + diffus) 
+	  					 ! normalisé par Es = PI
+			
+					
+         ! Demi plan PHIos + 180 degrés : Angles de visée négatifs par convention
+         !------------------------------------------------------------------------ 	    
+         DO J=NBMU,1,-1
+	    
+	    IF (IND_ANGOUT(J).EQ.1) THEN
+	    
+               TETA=DACOS(RMU(J))*180.D+00/INCTE_PI
+	
+	       COEF_A = (ANGDIFF_PHI2(I2,J)-ANGDIFF_PHI2(I1,J)) / DZ
+	       COEF_B = (Z2*ANGDIFF_PHI2(I1,J)-Z1*ANGDIFF_PHI2(I2,J))
+	       COEF_B = COEF_B / DZ		
+ 	       ANGDIFF = COEF_A*Z_OUT+COEF_B
+	 
+	       COEF_A = (XIT_PHI2(I2,J)-XIT_PHI2(I1,J)) / DZ
+	       COEF_B = (Z2*XIT_PHI2(I1,J)-Z1*XIT_PHI2(I2,J)) / DZ	
+ 	       XI = COEF_A*Z_OUT+COEF_B
+	 
+	       COEF_A = (XQT_PHI2(I2,J)-XQT_PHI2(I1,J)) / DZ
+	       COEF_B = (Z2*XQT_PHI2(I1,J)-Z1*XQT_PHI2(I2,J)) / DZ
+ 	       XQ = COEF_A*Z_OUT+COEF_B
+	 
+	       COEF_A = (XUT_PHI2(I2,J)-XUT_PHI2(I1,J)) / DZ
+	       COEF_B = (Z2*XUT_PHI2(I1,J)-Z1*XUT_PHI2(I2,J)) / DZ
+ 	       XU = COEF_A*Z_OUT+COEF_B
+		
+	       CALL OSOAA_POLAR(XI,XQ,XU,XAN,TPOL,LPOL)
+     
+               !Calcul de la réflectance et réflectance polarisée
+	       REFL = XI/FLUX_DOWN_NORMA
+	       REFL_POL = LPOL/FLUX_DOWN_NORMA
+
+	       !Enregistrement du champ montant
+               WRITE(10,850,ERR=1201) -TETA,
+     &          PHI2*180.D+00/INCTE_PI,
+     &                           ANGDIFF,XI,XQ,XU,REFL,TPOL,LPOL,
+     &	                        REFL_POL
+	    ENDIF !Fin test si angle de sortie
+         ENDDO !Boucle sur directions 
+
+
+         ! Demi plan PHIos  : Angles de visée positifs par convention
+         !------------------------------------------------------------------------ 	    
+         DO J=1,NBMU
+	    
+	    IF (IND_ANGOUT(J).EQ.1) THEN
+	       
+	       TETA=DACOS(RMU(J))*180.D+00/INCTE_PI
+	
+	       COEF_A = (ANGDIFF_PHI1(I2,J)-ANGDIFF_PHI1(I1,J)) / DZ 
+	       COEF_B = (Z2*ANGDIFF_PHI1(I1,J)-Z1*ANGDIFF_PHI1(I2,J)) 
+	       COEF_B = COEF_B / DZ	
+ 	       ANGDIFF = COEF_A*Z_OUT+COEF_B
+	 	
+	       COEF_A = (XIT_PHI1(I2,J)-XIT_PHI1(I1,J)) / DZ 
+	       COEF_B = (Z2*XIT_PHI1(I1,J)-Z1*XIT_PHI1(I2,J)) / DZ	
+ 	       XI = COEF_A*Z_OUT+COEF_B
+	 
+	       COEF_A = (XQT_PHI1(I2,J)-XQT_PHI1(I1,J)) / DZ
+	       COEF_B = (Z2*XQT_PHI1(I1,J)-Z1*XQT_PHI1(I2,J)) / DZ
+ 	       XQ = COEF_A*Z_OUT+COEF_B
+	 
+	       COEF_A = (XUT_PHI1(I2,J)-XUT_PHI1(I1,J)) / DZ
+	       COEF_B = (Z2*XUT_PHI1(I1,J)-Z1*XUT_PHI1(I2,J)) / DZ
+ 	       XU = COEF_A*Z_OUT+COEF_B
+		
+	       CALL OSOAA_POLAR(XI,XQ,XU,XAN,TPOL,LPOL)
+
+               !Calcul de la réflectance et réflectance polarisée	
+ 	       REFL = XI/FLUX_DOWN_NORMA
+	       REFL_POL = LPOL/FLUX_DOWN_NORMA
+ 
+	       !Enregistrement du champ montant
+	       !Enregistrement du champ montant
+               WRITE(10,850,ERR=1201) TETA,
+     &          PHI1*180.D+00/INCTE_PI,
+     &                           ANGDIFF,XI,XQ,XU,REFL,TPOL,LPOL,
+     &	                        REFL_POL
+	    ENDIF !Fin test si angle de sortie
+	    
+         ENDDO !Boucle sur directions   
+
+
+      ELSE !Cas DZ = 0. (peut apparaitre juste sous la surface : 
+           !             cas de limitation affichage numérique de la profondeur
+	   !             dans le fichier de profil marin)
+	   ! ==> Dans ce cas, le niveau est I1 = CTE_NT_ATM + 1
+
+
+         !Flux descendant total (normalisé par Es = PI) pour le niveau Z
+	 FLUX_DOWN_NORMA = PROFIL_FLUX_DOWN_TOT(I1)
+				       
+         ! Demi plan PHIos + 180 degrés : Angles de visée négatifs par convention
+         !------------------------------------------------------------------------ 	    
+         DO J=NBMU,1,-1
+
+	    IF (IND_ANGOUT(J).EQ.1) THEN   
+
+	       TETA=DACOS(RMU(J))*180.D+00/INCTE_PI
+
+ 	       ANGDIFF = ANGDIFF_PHI2(I1,J)
+ 	       XI = XIT_PHI2(I1,J)
+ 	       XQ = XQT_PHI2(I1,J)
+ 	       XU = XUT_PHI2(I1,J)
+	  	
+	       CALL OSOAA_POLAR(XI,XQ,XU,XAN,TPOL,LPOL)
+
+               !Calcul de la réflectance et réflectance polarisée
+	       REFL = XI/FLUX_DOWN_NORMA
+	       REFL_POL = LPOL/FLUX_DOWN_NORMA
+	    
+	       !Enregistrement du champ montant
+	       !Enregistrement du champ montant
+               WRITE(10,850,ERR=1201) -TETA,
+     &          PHI2*180.D+00/INCTE_PI,
+     &                           ANGDIFF,XI,XQ,XU,REFL,TPOL,LPOL,
+     &	                        REFL_POL
+	   
+	    ENDIF !Fin test si angle de sortie
+    
+         ENDDO !Boucle sur directions 
+
+
+         ! Demi plan PHIos  : Angles de visée positifs par convention
+         !------------------------------------------------------------------------ 	    
+         DO J=1,NBMU
+	 
+	    IF (IND_ANGOUT(J).EQ.1) THEN   
+
+               TETA=DACOS(RMU(J))*180.D+00/INCTE_PI
+	
+ 	       ANGDIFF = ANGDIFF_PHI1(I1,J)
+ 	       XI = XIT_PHI1(I1,J)
+ 	       XQ = XQT_PHI1(I1,J)
+ 	       XU = XUT_PHI1(I1,J)
+		
+	       CALL OSOAA_POLAR(XI,XQ,XU,XAN,TPOL,LPOL)
+ 
+               !Calcul de la réflectance et réflectance polarisée
+ 	       REFL = XI/FLUX_DOWN_NORMA
+	       REFL_POL = LPOL/FLUX_DOWN_NORMA
+     
+	       !Enregistrement du champ montant
+	       !Enregistrement du champ montant
+               WRITE(10,850,ERR=1201) TETA,
+     &          PHI1*180.D+00/INCTE_PI,
+     &                           ANGDIFF,XI,XQ,XU,REFL,TPOL,LPOL,
+     &	                        REFL_POL   
+	    
+	    ENDIF !Fin test si angle de sortie
+	    
+         ENDDO !Boucle sur les directions   
+      
+      ENDIF ! Fin test DZ = 0.
+      CLOSE(10) !Fermeture du fichier FICSOS_RES_VS_VZA         
+      PHI1 = PHI1 + PHI * INCTE_PI / 180.D+00
+      END DO
+      ENDIF
+   
      
       
       
@@ -2854,7 +3331,9 @@ C---------
   223 FORMAT(I4,1X,D21.14,2X,F7.3,2X,D21.14,2X,I2)	!Format Trace
       
   700 FORMAT(I4,1X,F12.3,2(2X,F7.2),2X,3(E13.6,2X),2(F7.2,2X),E13.6)
+  750 FORMAT(I4,1X,2(F12.3),2(2X,F7.2),2X,3(E13.6,2X),2(F7.2,2X),E13.6)
   800 FORMAT(2(F7.2,2X),2(E13.6,1X),2X,F7.2,2X,2(E13.6,1X))
+  850 FORMAT(3(F7.2,2X),4(E13.6,1X),2X,F7.2,2X,2(E13.6,1X))
   900 FORMAT(F10.5,2X,F7.2,2X,2(E13.6,1X),1X,F7.2,2X,2(E13.6,1X))
 
   600 FORMAT(2X,I4,1X,F12.5,2X,6(2X,E12.6))    		!Format fichier Flux.txt	
