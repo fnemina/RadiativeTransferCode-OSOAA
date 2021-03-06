@@ -3001,7 +3001,7 @@ C     pour toutes les directions de propagation descendantes.
 C    We set PHI = 0      
       PHI1 = 0 * INCTE_PI / 180.D+00
       
-      DO WHILE (PHI1.LE.INCTE_PI)
+      DO WHILE (PHI1.LT.INCTE_PI)
       CALL OSOAA_TRPHI(FICSOS_RES_BIN,NBMU,RMU,PHI1,
      &                 IMAT_SURF,N0,M0,WIND,SEA_IND,ATM_TAUEXT, 
      &                 SEA_TAUEXT,ANGDIFF_PHI1,			 
