@@ -3186,7 +3186,7 @@ C    We set PHI = 0
       CLOSE(10) !Fermeture du fichier FICSOS_RES_VS_VZA         
       PHI1 = PHI1 + PHI * INCTE_PI / 180.D+00
       END DO
-1986  ENDIF
+      ENDIF
    
      
       
