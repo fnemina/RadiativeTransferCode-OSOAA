@@ -7726,7 +7726,7 @@ C =========================================================
       ENDIF 
  
       CALL EXIT(1)    
- 9999 STOP
+      STOP
 
 
 
@@ -7985,7 +7985,7 @@ C --- FIN MOD
  1928 FORMAT(30h -SOS.ResFile.Bin       :     ,A)
  1929 FORMAT(30h -OSOAA.ResFile.Adv.Phi :     ,A)
   
-      END          !FIN DU PROGRAMME OSOAA_MAIN  
+ 9999 END          !FIN DU PROGRAMME OSOAA_MAIN  
 
 
 
